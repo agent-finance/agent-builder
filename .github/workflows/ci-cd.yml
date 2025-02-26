@@ -15,9 +15,20 @@ permissions:
   deployments: write
 
 jobs:
+  # Security Analysis job
+  # Skipped when merging from feature branch to staging or from staging to main
+  # since code has already been analyzed in the feature branch
   analyze:
     name: Security Analysis
     runs-on: ubuntu-latest
+    # Skip analysis when merging from staging to main or from feature to staging
+    if: |
+      !(github.ref == 'refs/heads/main' && 
+        github.event_name == 'pull_request' && 
+        github.head_ref == 'staging') &&
+      !(github.ref == 'refs/heads/staging' && 
+        github.event_name == 'pull_request' && 
+        startsWith(github.head_ref, 'feature/'))
     permissions:
       actions: read
       contents: read
@@ -40,10 +51,20 @@ jobs:
       with:
         category: "/language:javascript"
 
+  # Verification job that runs linting and tests
+  # This job is skipped when merging from a feature branch to staging
+  # or when merging from staging to main since code has already been verified
   verify:
     needs: analyze
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    if: |
+      !(github.ref == 'refs/heads/staging' && 
+        github.event_name == 'pull_request' && 
+        startsWith(github.head_ref, 'feature/')) &&
+      !(github.ref == 'refs/heads/main' && 
+        github.event_name == 'pull_request' && 
+        github.head_ref == 'staging')
 
     steps:
     - uses: actions/checkout@v4
@@ -60,9 +81,12 @@ jobs:
     - name: Run ESLint
       run: npm run lint || true
 
+  # Staging deployment job
+  # Depends on both analyze and verify, but both may be skipped
+  # when merging from feature branch to staging
   deploy-staging:
     if: github.ref == 'refs/heads/staging'
-    needs: verify
+    needs: [analyze, verify]
     runs-on: ubuntu-latest
     environment:
       name: staging
@@ -100,9 +124,12 @@ jobs:
       env:
         DEPLOY_URL: ${{ steps.deploy.outputs.url }}
 
+  # Production deployment job
+  # Depends on both analyze and verify, but both may be skipped
+  # when merging from staging to main
   deploy-production:
     if: github.ref == 'refs/heads/main'
-    needs: verify
+    needs: [analyze, verify]
     runs-on: ubuntu-latest
     environment:
       name: production
