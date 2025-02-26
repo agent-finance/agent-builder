@@ -91,7 +91,7 @@ jobs:
         name: build-output
         path: .next
 
-    - name: Deploy to Vercel (Staging)
+    - name: Deploy to Vercel (Preview)
       id: deploy
       uses: amondnet/vercel-action@v25
       with:
@@ -99,11 +99,10 @@ jobs:
         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        alias-domains: |
-          staging.agent-builder.vercel.app
-        vercel-args: '--prod --force'
+        github-comment: true
+        vercel-args: '--force'
 
-    - name: Comment Staging URL
+    - name: Comment Preview URL
       uses: actions/github-script@v7
       with:
         script: |
@@ -113,7 +112,7 @@ jobs:
               issue_number: issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `🚀 Staging deployment completed!\nURL: ${process.env.DEPLOY_URL}\nBranch: staging`
+              body: `🔍 Preview deployment completed!\nURL: ${process.env.DEPLOY_URL}\nBranch: staging`
             });
           }
       env:
