@@ -115,6 +115,8 @@ Our GitHub Actions workflow has been optimized for speed and efficiency:
 - **Smart Skip Logic**: 
   - Skip redundant security analysis when merging from feature to staging
   - Skip redundant verification when merging from staging to main
+  - Uses proper branch reference variables (`github.base_ref` and `github.head_ref`)
+  - Includes debug information for troubleshooting branch conditions
 
 ### Security Scanning Optimizations
 

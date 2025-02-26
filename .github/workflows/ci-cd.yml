@@ -41,11 +41,11 @@ jobs:
     runs-on: ubuntu-latest
     # Skip analysis when merging from staging to main or from feature to staging
     if: |
-      !(github.ref == 'refs/heads/main' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'main' && 
         github.head_ref == 'staging') &&
-      !(github.ref == 'refs/heads/staging' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'staging' && 
         startsWith(github.head_ref, 'feature/'))
     permissions:
       actions: read
@@ -53,6 +53,16 @@ jobs:
       security-events: write
 
     steps:
+    # Debug step to print branch information
+    - name: Debug Branch Information
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Base ref: ${{ github.base_ref }}"
+        echo "Head ref: ${{ github.head_ref }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Should skip for feature->staging: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && startsWith(github.head_ref, 'feature/') }}"
+        echo "Should skip for staging->main: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging' }}"
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -143,14 +153,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: |
-      !(github.ref == 'refs/heads/staging' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'staging' && 
         startsWith(github.head_ref, 'feature/')) &&
-      !(github.ref == 'refs/heads/main' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'main' && 
         github.head_ref == 'staging')
 
     steps:
+    # Debug step to print branch information
+    - name: Debug Branch Information
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Base ref: ${{ github.base_ref }}"
+        echo "Head ref: ${{ github.head_ref }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Should skip for feature->staging: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && startsWith(github.head_ref, 'feature/') }}"
+        echo "Should skip for staging->main: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging' }}"
+
     - uses: actions/checkout@v4
       with:
         fetch-depth: 1
