@@ -1,0 +1,11 @@
+{
+  "project": {
+    "name": "Agent Builder",
+    "startup": {
+      "enabled": true,
+      "script": "startup.ps1",
+      "runOnOpen": true,
+      "showOutput": false
+    }
+  }
+}
