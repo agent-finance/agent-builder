@@ -92,16 +92,31 @@ jobs:
         key: ${{ runner.os }}-codeql-${{ hashFiles('.github/workflows/ci-cd.yml') }}
         restore-keys: ${{ runner.os }}-codeql-
 
+    # First attempt with security-and-quality queries
     - name: Initialize CodeQL
+      id: init-codeql
+      continue-on-error: true
       uses: github/codeql-action/init@v3
       with:
         languages: javascript
-        # Use security-minimal for faster analysis
-        queries: security-minimal
+        # Use security-and-quality for comprehensive security analysis
+        queries: security-and-quality
         # Set up config file for optimizations
         config-file: ./.github/codeql/codeql-config.yml
         # Output debug information for troubleshooting
         debug: ${{ github.event_name == 'pull_request' }}
+
+    # Fallback to default queries if security-and-quality fails
+    - name: Initialize CodeQL (Fallback)
+      if: steps.init-codeql.outcome == 'failure'
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript
+        # Use default queries as fallback
+        # Set up config file for optimizations
+        config-file: ./.github/codeql/codeql-config.yml
+        # Output debug information for troubleshooting
+        debug: true
 
     # For pull requests, log the changed files for debugging
     - name: Log changed files

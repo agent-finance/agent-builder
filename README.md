@@ -119,11 +119,16 @@ Our GitHub Actions workflow has been optimized for speed and efficiency:
 ### Security Scanning Optimizations
 
 - **Custom CodeQL Configuration**: `.github/codeql/codeql-config.yml`
+- **Robust Query Suite**: 
+  - Uses `security-and-quality` query suite with fallback to default queries
+  - Custom query filters to focus on security-related issues
+  - Prioritizes medium and high severity issues
 - **Focused Security Scanning**:
   - Ignores test files, minified code, and generated content
-  - Focuses on high and medium severity issues
-  - Excludes low-precision results
+  - Excludes low-precision results to reduce false positives
+  - Filters out maintainability issues to focus on security
 - **Changed Files Analysis**: For pull requests, only analyzes modified files
+- **Fault Tolerance**: Automatic fallback to default queries if custom queries fail
 
 ### Deployment Optimizations
 
