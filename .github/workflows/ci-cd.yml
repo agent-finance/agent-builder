@@ -40,7 +40,7 @@ jobs:
       with:
         category: "/language:javascript"
 
-  build:
+  verify:
     needs: analyze
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -60,22 +60,9 @@ jobs:
     - name: Run ESLint
       run: npm run lint || true
 
-    - name: Build Application
-      run: npm run build
-      env:
-        NODE_ENV: production
-
-    - name: Upload Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-output
-        path: .next/
-        retention-days: 7
-        compression-level: 9
-
   deploy-staging:
     if: github.ref == 'refs/heads/staging'
-    needs: build
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: staging
@@ -84,12 +71,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-
-    - name: Download Build Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: build-output
-        path: .next
 
     - name: Deploy to Vercel (Preview)
       id: deploy
@@ -120,7 +101,7 @@ jobs:
 
   deploy-production:
     if: github.ref == 'refs/heads/main'
-    needs: build
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -129,12 +110,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-
-    - name: Download Build Artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: build-output
-        path: .next
     
     - name: Create GitHub Release
       id: create_release
