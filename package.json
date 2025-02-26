@@ -6,9 +6,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "playwright test",
-    "test:coverage": "playwright test --reporter=html",
-    "test:ui": "playwright test --ui",
     "lint": "eslint .",
     "format:check": "prettier --check .",
     "format": "prettier --write ."
@@ -20,7 +17,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@playwright/test": "^1.41.2",
     "eslint": "^9",
     "eslint-config-next": "15.1.7",
     "postcss": "^8",
