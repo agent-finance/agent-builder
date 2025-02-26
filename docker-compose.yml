@@ -5,13 +5,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     ports:
       - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=http://middleware:3001
 
   middleware:
@@ -24,7 +22,7 @@ services:
       - ./middleware:/app
       - /app/node_modules
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
       - SDK_HOST=sdk
       - SDK_PORT=3002
 
@@ -38,7 +36,7 @@ services:
       - ./sdk:/app
       - /app/node_modules
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=production
 
 networks:
   default:
