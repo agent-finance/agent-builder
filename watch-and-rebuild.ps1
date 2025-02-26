@@ -1,10 +1,14 @@
 $lastChange = Get-Date
 $pathsToWatch = @(
     ".\app",
-    ".\components",
+    ".\middleware",
+    ".\sdk",
     ".\public",
-    ".\styles",
-    ".\Dockerfile"
+    ".\Dockerfile",
+    ".\Dockerfile.dev",
+    ".\docker-compose.yml",
+    ".\docker-compose.dev.yml",
+    ".\next.config.mjs"
 )
 
 Write-Host "Starting to watch for changes..."
@@ -20,9 +24,9 @@ while ($true) {
 
     if ($changes) {
         Write-Host "Changes detected. Rebuilding Docker containers..."
-        docker-compose down
-        docker-compose build
-        docker-compose up -d
+        docker-compose -f docker-compose.dev.yml down
+        docker-compose -f docker-compose.dev.yml build
+        docker-compose -f docker-compose.dev.yml up -d
         $lastChange = Get-Date
         Write-Host "Rebuild complete. Watching for new changes..."
     }
