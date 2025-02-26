@@ -58,6 +58,25 @@ jobs:
       with:
         fetch-depth: 0
 
+    # Determine changed files for pull requests
+    - name: Get changed files
+      if: github.event_name == 'pull_request'
+      id: changed-files
+      uses: tj-actions/changed-files@v40
+      with:
+        files: |
+          **/*.js
+          **/*.jsx
+          **/*.ts
+          **/*.tsx
+        files_ignore: |
+          **/*.test.js
+          **/*.spec.js
+          **/*.min.js
+          node_modules/**
+          .next/**
+          public/**
+
     # Cache node modules to speed up the workflow
     - name: Cache Node Modules
       uses: actions/cache@v3
@@ -79,10 +98,17 @@ jobs:
         languages: javascript
         # Use security-minimal for faster analysis
         queries: security-minimal
-        # Only scan changed files for PRs to speed up analysis
-        packs: scope:javascript/changed-files
         # Set up config file for optimizations
         config-file: ./.github/codeql/codeql-config.yml
+        # Output debug information for troubleshooting
+        debug: ${{ github.event_name == 'pull_request' }}
+
+    # For pull requests, log the changed files for debugging
+    - name: Log changed files
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "Changed files:"
+        echo "${{ steps.changed-files.outputs.all_changed_files }}"
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3

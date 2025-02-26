@@ -8,11 +8,18 @@ paths-ignore:
   - '**/*.min.js'
   - '.next/**'
   - 'public/**'
+  - 'dist/**'
+  - 'build/**'
+  - '**/vendor/**'
   
 # Focus on high-priority security concerns
 query-filters:
   - exclude:
       tags contain: maintainability
+  - exclude:
+      precision: low
+  - exclude:
+      problem.severity: recommendation
 
 # Performance optimizations
 optimization:
@@ -24,3 +31,17 @@ optimization:
   
   # Focus on high-severity issues
   security-severity-threshold: medium
+
+# For pull requests, analyze only changed files
+path-filters:
+  - if:
+      event: pull_request
+    include:
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.ts'
+      - '**/*.tsx'
+    exclude:
+      - '**/*.test.js'
+      - '**/*.spec.js'
+      - '**/*.min.js'
