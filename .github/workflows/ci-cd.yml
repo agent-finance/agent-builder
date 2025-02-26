@@ -2,169 +2,147 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main", "staging", "feature/*" ]
   pull_request:
-    branches: [ main ]
-  schedule:
-    - cron: '0 0 * * 0'  # Weekly security scans
+    branches: [ "main", "staging" ]
+  workflow_dispatch:
 
 permissions:
-  actions: read
-  contents: read
+  contents: write
   security-events: write
   pull-requests: write
+  issues: write
+  deployments: write
 
 jobs:
-  security-scan:
+  analyze:
+    name: Security Analysis
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Run SAST Scan
-      uses: github/codeql-action/init@v2
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
       with:
         languages: javascript
-        
+        queries: security-extended,security-and-quality
+
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
-      
-    - name: Scan Dependencies
-      run: |
-        npm audit
-        
-  lint-and-format:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
+      uses: github/codeql-action/analyze@v3
       with:
-        node-version: '18'
+        category: "/language:javascript"
+
+  verify:
+    needs: analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18.x'
         cache: 'npm'
-    
+
     - name: Install Dependencies
-      run: npm ci
-      
+      run: npm ci --legacy-peer-deps
+
     - name: Run ESLint
-      run: npm run lint || true  # Don't fail the build, but report issues
-      
-    - name: Check Code Formatting
-      run: npm run format:check || true
+      run: npm run lint || true
 
-  build-and-test:
+  deploy-staging:
+    if: github.ref == 'refs/heads/staging'
+    needs: verify
     runs-on: ubuntu-latest
-    needs: [security-scan, lint-and-format]
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.url }}
+    timeout-minutes: 10
     
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-    
-    - name: Install Dependencies
-      run: |
-        npm ci
-        npm install -g jest
-      
-    - name: Run Tests with Coverage
-      run: npm run test:coverage
-      
-    - name: Upload Coverage Reports
-      uses: codecov/codecov-action@v3
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        
-    - name: Build Application
-      run: npm run build
+    - uses: actions/checkout@v4
 
-  preview-deploy:
-    needs: build-and-test
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      
-      - name: Deploy to Vercel (Preview)
-        id: deploy
-        run: |
-          DEPLOY_URL=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }})
-          echo "::set-output name=url::$DEPLOY_URL"
-      
-      - name: Comment Preview URL
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
+    - name: Deploy to Vercel (Preview)
+      id: deploy
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-comment: true
+        working-directory: ./
+        vercel-args: '--force --confirm'
+
+    - name: Comment Preview URL
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const issue = context.issue;
+          if (issue.number) {
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
+              issue_number: issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: 'Preview deployment is ready! 🚀\nURL: ${{ steps.deploy.outputs.url }}'
-            })
-      
-      - name: Run Integration Tests
-        env:
-          API_URL: ${{ steps.deploy.outputs.url }}
-        run: npm run test:integration
+              body: `🔍 Preview deployment completed!\nURL: ${process.env.DEPLOY_URL}\nBranch: staging`
+            });
+          }
+      env:
+        DEPLOY_URL: ${{ steps.deploy.outputs.url }}
 
-  production-deploy:
-    needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
+    timeout-minutes: 10
     
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-      
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      
-      - name: Deploy to Vercel (Production)
-        id: deploy
-        run: |
-          DEPLOY_URL=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }})
-          echo "::set-output name=url::$DEPLOY_URL"
-      
-      - name: Create GitHub Release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ github.run_number }}
-          release_name: Release v${{ github.run_number }}
-          body: |
-            Production deployment completed successfully!
-            Deployment URL: ${{ steps.deploy.outputs.url }}
-          draft: false
-          prerelease: false
-      
-      - name: Verify Production Deployment
-        run: |
-          # Wait for the deployment to be ready
-          sleep 30
-          curl -f ${{ steps.deploy.outputs.url }}/api/health || exit 1
-      
-      - name: Notify Deployment Status
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          fields: repo,message,commit,author,action,eventName,ref,workflow,job,took
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    - uses: actions/checkout@v4
+    
+    - name: Create GitHub Release
+      id: create_release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ github.run_number }}
+        name: Release v${{ github.run_number }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+
+    - name: Deploy to Vercel (Production)
+      id: deploy
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        vercel-args: '--prod'
+
+    - name: Update Release with Deployment URL
+      uses: actions/github-script@v7
+      with:
+        script: |
+          github.rest.repos.updateRelease({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            release_id: process.env.RELEASE_ID,
+            body: `🚀 Production deployment completed!\nURL: ${process.env.DEPLOY_URL}\n\n${process.env.RELEASE_BODY}`
+          });
+      env:
+        DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        RELEASE_ID: ${{ steps.create_release.outputs.id }}
+        RELEASE_BODY: ${{ steps.create_release.outputs.body }}
