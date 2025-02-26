@@ -1,0 +1,26 @@
+name: "CodeQL Configuration"
+
+# Optimize CodeQL analysis for faster scanning
+paths-ignore:
+  - node_modules
+  - '**/*.test.js'
+  - '**/*.spec.js'
+  - '**/*.min.js'
+  - '.next/**'
+  - 'public/**'
+  
+# Focus on high-priority security concerns
+query-filters:
+  - exclude:
+      tags contain: maintainability
+
+# Performance optimizations
+optimization:
+  # Reduce memory usage
+  constraint-file-size: 10mb
+  
+  # Increase performance
+  threads: 4
+  
+  # Focus on high-severity issues
+  security-severity-threshold: medium
