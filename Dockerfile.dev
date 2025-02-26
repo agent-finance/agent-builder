@@ -1,0 +1,21 @@
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Set development environment
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+
+# Expose the port the app runs on
+EXPOSE 3000
+
+# Start the application in development mode
+CMD ["npm", "run", "dev"]
