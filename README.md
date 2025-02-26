@@ -129,6 +129,10 @@ Our GitHub Actions workflow has been optimized for speed and efficiency:
   - Filters out maintainability issues to focus on security
 - **Changed Files Analysis**: For pull requests, only analyzes modified files
 - **Fault Tolerance**: Automatic fallback to default queries if custom queries fail
+- **Performance Tuning**:
+  - Multi-threaded analysis (4 threads)
+  - Includes code snippets in results for easier review
+  - Proper categorization of findings
 
 ### Deployment Optimizations
 

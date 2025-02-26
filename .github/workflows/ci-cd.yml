@@ -128,9 +128,12 @@ jobs:
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
+        # Use multiple threads for analysis
+        threads: 4
+        # Add code snippets to the results
+        add-snippets: true
+        # Category for the results
         category: "/language:javascript"
-        # Add upload threads for faster uploads
-        upload-threads: 5
 
   # Verification job that runs linting and tests
   # This job is skipped when merging from a feature branch to staging
