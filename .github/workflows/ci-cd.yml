@@ -99,7 +99,9 @@ jobs:
         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        vercel-args: '--prod'
+        alias-domains: |
+          staging.agent-builder.vercel.app
+        vercel-args: '--prod --force'
 
     - name: Comment Staging URL
       uses: actions/github-script@v7
@@ -111,7 +113,7 @@ jobs:
               issue_number: issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `✨ Staging deployment is ready!\nURL: ${process.env.DEPLOY_URL}`
+              body: `🚀 Staging deployment completed!\nURL: ${process.env.DEPLOY_URL}\nBranch: staging`
             });
           }
       env:
