@@ -1,0 +1,58 @@
+name: "CodeQL Configuration"
+
+# Optimize CodeQL analysis for faster scanning
+paths-ignore:
+  - node_modules
+  - '**/*.test.js'
+  - '**/*.spec.js'
+  - '**/*.min.js'
+  - '.next/**'
+  - 'public/**'
+  - 'dist/**'
+  - 'build/**'
+  - '**/vendor/**'
+  
+# Focus on high-priority security concerns
+query-filters:
+  # Exclude maintainability issues to focus on security
+  - exclude:
+      tags contain: maintainability
+  # Exclude low-precision results to reduce false positives
+  - exclude:
+      precision: low
+  # Exclude recommendations to focus on actual problems
+  - exclude:
+      problem.severity: recommendation
+  # Include only security-related queries
+  - include:
+      tags contain: security
+  # Include only medium and high severity issues
+  - include:
+      problem.severity:
+        - error
+        - warning
+
+# Performance optimizations
+optimization:
+  # Reduce memory usage
+  constraint-file-size: 10mb
+  
+  # Increase performance
+  threads: 4
+  
+  # Focus on high-severity issues
+  security-severity-threshold: medium
+
+# For pull requests, analyze only changed files
+path-filters:
+  - if:
+      event: pull_request
+    include:
+      - '**/*.js'
+      - '**/*.jsx'
+      - '**/*.ts'
+      - '**/*.tsx'
+    exclude:
+      - '**/*.test.js'
+      - '**/*.spec.js'
+      - '**/*.min.js'
