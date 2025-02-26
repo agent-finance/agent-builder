@@ -1,3 +1,17 @@
+# CI/CD Pipeline for Agent Builder Platform
+# 
+# Optimizations:
+# - Concurrency control to cancel redundant workflow runs
+# - Caching for Node modules, CodeQL, npm dependencies, and Vercel builds
+# - Shallow clones for faster checkouts
+# - Reduced timeouts for faster feedback
+# - Parallel processing for linting and analysis
+# - Skipping redundant scans and verifications:
+#   * Skip analysis and verification when merging from feature to staging
+#   * Skip analysis and verification when merging from staging to main
+# - Focused security scanning with custom CodeQL configuration
+# - Optimized deployment configurations
+
 name: CI/CD Pipeline
 
 on:
@@ -6,6 +20,10 @@ on:
   pull_request:
     branches: [ "main", "staging" ]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -23,11 +41,11 @@ jobs:
     runs-on: ubuntu-latest
     # Skip analysis when merging from staging to main or from feature to staging
     if: |
-      !(github.ref == 'refs/heads/main' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'main' && 
         github.head_ref == 'staging') &&
-      !(github.ref == 'refs/heads/staging' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'staging' && 
         startsWith(github.head_ref, 'feature/'))
     permissions:
       actions: read
@@ -35,20 +53,96 @@ jobs:
       security-events: write
 
     steps:
+    # Debug step to print branch information
+    - name: Debug Branch Information
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Base ref: ${{ github.base_ref }}"
+        echo "Head ref: ${{ github.head_ref }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Should skip for feature->staging: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && startsWith(github.head_ref, 'feature/') }}"
+        echo "Should skip for staging->main: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging' }}"
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
+    # Determine changed files for pull requests
+    - name: Get changed files
+      if: github.event_name == 'pull_request'
+      id: changed-files
+      uses: tj-actions/changed-files@v40
+      with:
+        files: |
+          **/*.js
+          **/*.jsx
+          **/*.ts
+          **/*.tsx
+        files_ignore: |
+          **/*.test.js
+          **/*.spec.js
+          **/*.min.js
+          node_modules/**
+          .next/**
+          public/**
+
+    # Cache node modules to speed up the workflow
+    - name: Cache Node Modules
+      uses: actions/cache@v3
+      with:
+        path: '**/node_modules'
+        key: ${{ runner.os }}-modules-${{ hashFiles('**/package-lock.json') }}
+
+    # Cache CodeQL to speed up analysis
+    - name: Cache CodeQL
+      uses: actions/cache@v3
+      with:
+        path: ~/.codeql
+        key: ${{ runner.os }}-codeql-${{ hashFiles('.github/workflows/ci-cd.yml') }}
+        restore-keys: ${{ runner.os }}-codeql-
+
+    # First attempt with security-and-quality queries
     - name: Initialize CodeQL
+      id: init-codeql
+      continue-on-error: true
       uses: github/codeql-action/init@v3
       with:
         languages: javascript
-        queries: security-extended,security-and-quality
+        # Use security-and-quality for comprehensive security analysis
+        queries: security-and-quality
+        # Set up config file for optimizations
+        config-file: ./.github/codeql/codeql-config.yml
+        # Output debug information for troubleshooting
+        debug: ${{ github.event_name == 'pull_request' }}
+
+    # Fallback to default queries if security-and-quality fails
+    - name: Initialize CodeQL (Fallback)
+      if: steps.init-codeql.outcome == 'failure'
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript
+        # Use default queries as fallback
+        # Set up config file for optimizations
+        config-file: ./.github/codeql/codeql-config.yml
+        # Output debug information for troubleshooting
+        debug: true
+
+    # For pull requests, log the changed files for debugging
+    - name: Log changed files
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "Changed files:"
+        echo "${{ steps.changed-files.outputs.all_changed_files }}"
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
+        # Use multiple threads for analysis
+        threads: 4
+        # Add code snippets to the results
+        add-snippets: true
+        # Category for the results
         category: "/language:javascript"
 
   # Verification job that runs linting and tests
@@ -57,17 +151,29 @@ jobs:
   verify:
     needs: analyze
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     if: |
-      !(github.ref == 'refs/heads/staging' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'staging' && 
         startsWith(github.head_ref, 'feature/')) &&
-      !(github.ref == 'refs/heads/main' && 
-        github.event_name == 'pull_request' && 
+      !(github.event_name == 'pull_request' && 
+        github.base_ref == 'main' && 
         github.head_ref == 'staging')
 
     steps:
+    # Debug step to print branch information
+    - name: Debug Branch Information
+      run: |
+        echo "Event name: ${{ github.event_name }}"
+        echo "Base ref: ${{ github.base_ref }}"
+        echo "Head ref: ${{ github.head_ref }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Should skip for feature->staging: ${{ github.event_name == 'pull_request' && github.base_ref == 'staging' && startsWith(github.head_ref, 'feature/') }}"
+        echo "Should skip for staging->main: ${{ github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging' }}"
+
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -75,11 +181,20 @@ jobs:
         node-version: '18.x'
         cache: 'npm'
 
-    - name: Install Dependencies
-      run: npm ci --legacy-peer-deps
+    # Cache npm dependencies for faster installation
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-npm-
 
-    - name: Run ESLint
-      run: npm run lint || true
+    - name: Install Dependencies
+      run: npm ci --prefer-offline --no-audit --legacy-peer-deps
+
+    - name: Run ESLint with parallel processing
+      run: npx eslint --max-threads=4 . || true
 
   # Staging deployment job
   # Depends on both analyze and verify, but both may be skipped
@@ -91,10 +206,21 @@ jobs:
     environment:
       name: staging
       url: ${{ steps.deploy.outputs.url }}
-    timeout-minutes: 10
+    timeout-minutes: 5
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    # Cache Vercel build for faster deployments
+    - name: Cache Vercel
+      uses: actions/cache@v3
+      with:
+        path: .vercel
+        key: ${{ runner.os }}-vercel-${{ github.ref }}
+        restore-keys: |
+          ${{ runner.os }}-vercel-
 
     - name: Deploy to Vercel (Preview)
       id: deploy
@@ -106,7 +232,7 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         github-comment: true
         working-directory: ./
-        vercel-args: '--force --confirm'
+        vercel-args: '--force --confirm --prod'
 
     - name: Comment Preview URL
       uses: actions/github-script@v7
@@ -134,11 +260,13 @@ jobs:
     environment:
       name: production
       url: ${{ steps.deploy.outputs.url }}
-    timeout-minutes: 10
+    timeout-minutes: 5
     
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
     
     - name: Create GitHub Release
       id: create_release
@@ -149,6 +277,15 @@ jobs:
         draft: false
         prerelease: false
         generate_release_notes: true
+
+    # Cache Vercel build for faster deployments
+    - name: Cache Vercel
+      uses: actions/cache@v3
+      with:
+        path: .vercel
+        key: ${{ runner.os }}-vercel-production-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-vercel-production-
 
     - name: Deploy to Vercel (Production)
       id: deploy

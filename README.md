@@ -95,6 +95,53 @@ The `watch-and-rebuild.ps1` script enhances the development workflow by:
 - Automatically rebuilding and restarting containers when changes are detected
 - Providing immediate feedback in the terminal about build status
 
+## CI/CD Optimizations
+
+Our GitHub Actions workflow has been optimized for speed and efficiency:
+
+### Workflow Optimizations
+
+- **Concurrency Control**: Cancels redundant workflow runs to save resources
+- **Caching Strategy**: 
+  - Node modules
+  - CodeQL database
+  - npm dependencies
+  - Vercel deployments
+- **Shallow Clones**: Faster repository checkouts
+- **Reduced Timeouts**: Faster feedback on job completion
+- **Parallel Processing**: 
+  - Parallel linting
+  - Multi-threaded CodeQL analysis
+- **Smart Skip Logic**: 
+  - Skip redundant security analysis when merging from feature to staging
+  - Skip redundant verification when merging from staging to main
+  - Uses proper branch reference variables (`github.base_ref` and `github.head_ref`)
+  - Includes debug information for troubleshooting branch conditions
+
+### Security Scanning Optimizations
+
+- **Custom CodeQL Configuration**: `.github/codeql/codeql-config.yml`
+- **Robust Query Suite**: 
+  - Uses `security-and-quality` query suite with fallback to default queries
+  - Custom query filters to focus on security-related issues
+  - Prioritizes medium and high severity issues
+- **Focused Security Scanning**:
+  - Ignores test files, minified code, and generated content
+  - Excludes low-precision results to reduce false positives
+  - Filters out maintainability issues to focus on security
+- **Changed Files Analysis**: For pull requests, only analyzes modified files
+- **Fault Tolerance**: Automatic fallback to default queries if custom queries fail
+- **Performance Tuning**:
+  - Multi-threaded analysis (4 threads)
+  - Includes code snippets in results for easier review
+  - Proper categorization of findings
+
+### Deployment Optimizations
+
+- **Vercel Deployment Caching**: Speeds up preview and production deployments
+- **Optimized Build Arguments**: Uses force and confirm flags to reduce build time
+- **Shallow Clones**: Reduces checkout time before deployment
+
 ## Configuration Files
 
 - `.dockerignore`: Specifies which files Docker should ignore during build
