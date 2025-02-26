@@ -81,7 +81,8 @@ jobs:
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
         github-comment: true
-        vercel-args: '--force'
+        working-directory: ./
+        vercel-args: '--force --confirm'
 
     - name: Comment Preview URL
       uses: actions/github-script@v7
